@@ -83,19 +83,37 @@ RegisterNetEvent('qb-taxi:server:NpcPay', function(payment, hasReceivedBonus)
 end)
 
 
-
-RegisterServerEvent('custom:VanishRentedVehicle')
-AddEventHandler('custom:VanishRentedVehicle', function()
+-- Server-side event to charge the player $1000 for renting a vehicle
+RegisterNetEvent('custom:ChargeForRental')
+AddEventHandler('custom:ChargeForRental', function(data)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    if Player then
-        -- Example: Replace with the logic to delete or despawn the player's rented vehicle
-        local rentedVehicle = GetVehiclePedIsIn(GetPlayerPed(src), false)
-        if rentedVehicle then
-            DeleteEntity(rentedVehicle)
-            QBCore.Functions.Notify(src, "The rented vehicle has been returned", "success")
-        else
-            QBCore.Functions.Notify(src, "No rented vehicle found", "error")
-        end
+    local xPlayer = QBCore.Functions.GetPlayer(src)
+    local amountToCharge = 1000
+    local bankBalance = xPlayer.PlayerData.money['bank']
+    local cashBalance = xPlayer.PlayerData.money['cash']
+
+    if bankBalance >= amountToCharge then
+        -- Charge from bank account
+        xPlayer.Functions.RemoveMoney('bank', amountToCharge, "Vehicle rental")
+        TriggerClientEvent('custom:ChargeForRentalResult', src, true, data)
+    elseif cashBalance >= amountToCharge then
+        -- Charge from cash if bank doesn't have enough
+        xPlayer.Functions.RemoveMoney('cash', amountToCharge, "Vehicle rental")
+        TriggerClientEvent('custom:ChargeForRentalResult', src, true, data)
+    else
+        -- Insufficient funds
+        TriggerClientEvent('custom:ChargeForRentalResult', src, false)
     end
+end)
+
+
+-- Server-side event to credit $750 to the player's bank account
+RegisterNetEvent('custom:CreditForVehicleReturn')
+AddEventHandler('custom:CreditForVehicleReturn', function()
+    local src = source
+    local xPlayer = QBCore.Functions.GetPlayer(src)
+    local creditAmount = 750
+
+    xPlayer.Functions.AddMoney('bank', creditAmount, "Vehicle returned")
+    TriggerClientEvent('QBCore:Notify', src, 'You have been credited $750 for returning the vehicle.', 'success')
 end)

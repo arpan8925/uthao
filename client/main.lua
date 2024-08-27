@@ -115,11 +115,8 @@ local function SpawnBossPed()
     else
         groundZ = coords.z -- Fall back to the original Z coordinate if ground Z is not found
     end
-    
-    -- Create the ped using the specified coordinates and adjusted Z coordinate
     local entity = CreatePed(0, model, coords.x, coords.y, groundZ, coords.w, true, false)
 
-    -- Set ped properties: freeze position, make invincible, and block non-temporary events
     FreezeEntityPosition(entity, true)
     SetEntityInvincible(entity, true)
     SetBlockingOfNonTemporaryEvents(entity, true)
@@ -137,8 +134,6 @@ local function OpenBossMenu()
     QBCore.Functions.TriggerCallback('custom:CheckDutyStatus', function(isOnDuty)
 
         local onDutyStatus = isOnDuty and "Already On Duty" or "Go On Duty"
-
-
 
         lib.registerContext({
 
@@ -210,10 +205,6 @@ local function OpenBossMenu()
 
         })
 
-
-
-        -- Show the menu after registering it
-
         lib.showContext('boss_menu')
 
     end)
@@ -222,94 +213,62 @@ end
 
 
 
--- Register the /taxigooffduty command
-
 RegisterCommand('taxigooffduty', function()
     QBCore.Functions.TriggerCallback('custom:CheckDutyStatus', function(isOnDuty)
         if isOnDuty then
             local playerPed = PlayerPedId()
             local veh = GetVehiclePedIsIn(playerPed, false) -- Get the vehicle the player is in
             local playerInCorrectVehicle = false
+            QBCore.Functions.Notify("Bhai Off Duty Hoisos", "success")
 
-            -- Check if the player is in the correct job vehicle
-            if veh and DoesEntityExist(veh) then
-                local plate = GetVehicleNumberPlateText(veh)
-                if playerVehicle and plate == GetVehicleNumberPlateText(NetToVeh(playerVehicle)) then
-                    playerInCorrectVehicle = true
-                end
-            end
-
-            if playerInCorrectVehicle then
-                QBCore.Functions.Notify("Bhai Off Duty Hoisos", "success")
-
-                -- Remove NPC blip
-                if NpcData.NpcBlip ~= nil and DoesBlipExist(NpcData.NpcBlip) then
-                    print("[DEBUG] Removing NPC blip ID: " .. tostring(NpcData.NpcBlip))
-                    SafeCall(RemoveBlip, NpcData.NpcBlip)
-                    NpcData.NpcBlip = nil -- Dereference the blip
-                else
-                    print("[DEBUG] No valid NPC blip to remove or blip does not exist.")
-                end
-
-                -- Remove NPC
-                if NpcData.Npc ~= nil then
-                    SafeCall(function()
-                        local RemovePed = function(p)
-                            SetTimeout(60000, function()
-                                DeletePed(p)
-                            end)
-                        end
-                        RemovePed(NpcData.Npc)
-                    end)
-                end
-
-                -- Reset NPC task
-                SafeCall(ResetNpcTask)
-                QBCore.Functions.Notify("You are now off duty. Onduty Function Call", "success")
-
-                -- Toggle off duty on the server and vanish rented vehicle
-                TriggerServerEvent('custom:ToggleDuty')
-                TriggerServerEvent('custom:VanishRentedVehicle')
-
-                -- Remove player's helmet/hat
-                ClearPedProp(playerPed, 0)    
-
-                -- Clear the stored vehicle reference
-                playerVehicle = nil
+            -- Remove NPC blip
+            if NpcData.NpcBlip ~= nil and DoesBlipExist(NpcData.NpcBlip) then
+                print("[DEBUG] Removing NPC blip ID: " .. tostring(NpcData.NpcBlip))
+                SafeCall(RemoveBlip, NpcData.NpcBlip)
+                NpcData.NpcBlip = nil -- Dereference the blip
             else
-                QBCore.Functions.Notify("Error: You must be in the job vehicle to go off duty", "error")
+                print("[DEBUG] No valid NPC blip to remove or blip does not exist.")
             end
+
+            -- Remove NPC
+            if NpcData.Npc ~= nil then
+                SafeCall(function()
+                    local RemovePed = function(p)
+                        SetTimeout(60000, function()
+                            DeletePed(p)
+                        end)
+                    end
+                    RemovePed(NpcData.Npc)
+                end)
+            end
+            -- Reset NPC task
+            SafeCall(ResetNpcTask)
+            QBCore.Functions.Notify("You are now off duty. Onduty Function Call", "success")
+
+            -- Toggle off duty on the server and vanish rented vehicle
+            TriggerServerEvent('custom:ToggleDuty')
+
+            -- Remove player's helmet/hat
+            ClearPedProp(playerPed, 0)    
+
+            -- Clear the stored vehicle reference
+            playerVehicle = nil
         else
             QBCore.Functions.Notify("You are already off duty", "error")
         end
     end)
 end, false) -- false means the command doesn't need to be run as an admin
 
-
--- Spawn the boss ped when the script is loaded and set up ox_target interaction
-
 CreateThread(function()
-
     local bossPedEntity = SpawnBossPed()
-
-
-
-    -- Set up ox_target interaction with multiple options
-
     exports.ox_target:addLocalEntity(bossPedEntity, {
 
         name = "boss_target",
-
         label = 'Taxi Boss',
-
         icon = 'fa-solid fa-pen',
-
         onSelect = function ()
-
             OpenBossMenu()
-
         end 
-
     })
 
 end)
@@ -612,51 +571,56 @@ function TaxiGarage()
     exports['qb-menu']:openMenu(vehicleMenu)
 end
 
+RegisterNetEvent('custom:ChargeForRentalResult')
+AddEventHandler('custom:ChargeForRentalResult', function(success, data)
+    if success then
+        local SpawnPoint = getVehicleSpawnPoint()
+        if SpawnPoint then
+            local coords = vector3(Config.CabSpawns[SpawnPoint].x, Config.CabSpawns[SpawnPoint].y, Config.CabSpawns[SpawnPoint].z)
+            local CanSpawn = IsSpawnPointClear(coords, 2.0)
+            if CanSpawn then
+                QBCore.Functions.TriggerCallback('QBCore:Server:SpawnVehicle', function(netId)
+                    local veh = NetToVeh(netId)
+                    playerVehicle = netId  -- Store the vehicle network ID
+                    SetVehicleNumberPlateText(veh, 'TAXI' .. tostring(math.random(1000, 9999)))
+                    exports['LegacyFuel']:SetFuel(veh, 100.0)
+                    closeMenuFull()
+                    SetEntityHeading(veh, Config.CabSpawns[SpawnPoint].w)
+                    TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
+                    TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
+                    SetVehicleEngineOn(veh, true, true)
+                    Citizen.Wait(100)
+                    if IsThisModelABike(GetEntityModel(veh)) then
+                        Citizen.Wait(2000)  -- Wait for 2 seconds
+                        local playerPed = PlayerPedId()
+                        local hatDrawable = 18  -- Helmet or Hat ID
+                        local hatTexture = 0  -- Helmet or Hat Texture ID
 
-RegisterNetEvent('qb-taxi:client:TakeVehicle', function(data)
-    local SpawnPoint = getVehicleSpawnPoint()
-    if SpawnPoint then
-        local coords = vector3(Config.CabSpawns[SpawnPoint].x, Config.CabSpawns[SpawnPoint].y, Config.CabSpawns[SpawnPoint].z)
-        local CanSpawn = IsSpawnPointClear(coords, 2.0)
-        if CanSpawn then
-            QBCore.Functions.TriggerCallback('QBCore:Server:SpawnVehicle', function(netId)
-                local veh = NetToVeh(netId)
-                playerVehicle = netId  -- Store the vehicle network ID
-                SetVehicleNumberPlateText(veh, 'TAXI' .. tostring(math.random(1000, 9999)))
-                exports['LegacyFuel']:SetFuel(veh, 100.0)
-                closeMenuFull()
-                SetEntityHeading(veh, Config.CabSpawns[SpawnPoint].w)
-                TaskWarpPedIntoVehicle(PlayerPedId(), veh, -1)
-                TriggerEvent('vehiclekeys:client:SetOwner', QBCore.Functions.GetPlate(veh))
-                SetVehicleEngineOn(veh, true, true)
-
-                Citizen.Wait(100)
-
-                -- Wear a helmet or hat after 2 seconds if it's a bike
-                if IsThisModelABike(GetEntityModel(veh)) then
-                    Citizen.Wait(2000)  -- Wait for 2 seconds
-                    local playerPed = PlayerPedId()
-                    local hatDrawable = 18  -- Helmet or Hat ID
-                    local hatTexture = 0  -- Helmet or Hat Texture ID
-
-                    -- Apply helmet or hat using SetPedPropIndex
-                    SetPedPropIndex(playerPed, 0, hatDrawable, hatTexture, true)
-                    print("Helmet Applied")
-                end
-
-
-
-                Citizen.Wait(100)
-                TriggerEvent('qb-taxi:client:DoTaxiNpc')
-            end, data.model, coords, true)
+                        -- Apply helmet or hat using SetPedPropIndex
+                        SetPedPropIndex(playerPed, 0, hatDrawable, hatTexture, true)
+                        print("Helmet Applied")
+                    end
+                    Citizen.Wait(100)
+                    TriggerEvent('qb-taxi:client:DoTaxiNpc')
+                end, data.model, coords, true)
+            else
+                QBCore.Functions.Notify(Lang:t('info.no_spawn_point'), 'error')
+            end
         else
             QBCore.Functions.Notify(Lang:t('info.no_spawn_point'), 'error')
+            return
         end
     else
-        QBCore.Functions.Notify(Lang:t('info.no_spawn_point'), 'error')
-        return
+        QBCore.Functions.Notify("Bhai Tui Gorib", 'error')
     end
 end)
+
+
+RegisterNetEvent('qb-taxi:client:TakeVehicle', function(data)
+    -- Trigger the server event to charge the player
+    TriggerServerEvent('custom:ChargeForRental', data)
+end)
+
 
 
 function closeMenuFull()
@@ -911,7 +875,8 @@ RegisterNetEvent('qb-taxijob:client:requestcab', function()
     TaxiGarage()
 end)
 
--- added checks to disable distance checking if polyzone option is used
+local cooldown = false
+
 CreateThread(function()
     while true do
         if not Config.UseTarget then
@@ -928,11 +893,20 @@ CreateThread(function()
                         if vehDist < 1.5 then
                             if whitelistedVehicle() then
                                 DrawText3D(Config.parkLocation.x, Config.parkLocation.y, Config.parkLocation.z + 0.3, Lang:t('info.vehicle_parking'))
-                                if IsControlJustReleased(0, 38) then
+                                if IsControlJustReleased(0, 38) and not cooldown then
                                     if IsPedInAnyVehicle(PlayerPedId(), false) then
+                                        cooldown = true -- Set cooldown to true to prevent duplicate triggering
                                         local vehicle = GetVehiclePedIsIn(PlayerPedId())
                                         DeleteVehicle(vehicle)
                                         playerVehicle = nil -- Reset the vehicle identifier after deletion
+
+                                        -- Trigger server event to credit $750 to the player's bank account
+                                        TriggerServerEvent('custom:CreditForVehicleReturn')
+                                        
+                                        -- Set a timeout to reset the cooldown
+                                        SetTimeout(5000, function()
+                                            cooldown = false
+                                        end)
                                     end
                                 end
                             else
@@ -956,6 +930,7 @@ CreateThread(function()
         Wait(3)
     end
 end)
+
 
 -- POLY & TARGET Conversion code
 
