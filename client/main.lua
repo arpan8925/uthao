@@ -1,6 +1,7 @@
 -- Variables
 
 local QBCore = exports['qb-core']:GetCoreObject()
+local BossPeds = require('client.boss_ped')
 
 local meterIsOpen = false
 local meterActive = false
@@ -40,6 +41,8 @@ local NpcData = {
     distanceLeft = 0,
     CrashCount = 0
 }
+
+BossPeds.SpawnAndSetupBossPeds()
 
 -- events
 --just to prevent some bug if the resource get restarted on production
@@ -94,125 +97,6 @@ local function ResetNpcTask()
 end
 
 
-
--- Function to spawn the boss ped
-local function SpawnBossPed()
-    -- Extract model and coordinates from the configuration
-    local model = GetHashKey(Config.bossPed.model)
-    local coords = Config.bossPed.coords
-
-    -- Request the model manually
-    RequestModel(model)
-    while not HasModelLoaded(model) do
-        Wait(0)
-    end
-
-    -- Get the ground Z coordinate
-    local groundZ
-    local foundGround, zPos = GetGroundZFor_3dCoord(coords.x, coords.y, coords.z, 0)
-    if foundGround then
-        groundZ = zPos
-    else
-        groundZ = coords.z -- Fall back to the original Z coordinate if ground Z is not found
-    end
-    local entity = CreatePed(0, model, coords.x, coords.y, groundZ, coords.w, true, false)
-
-    FreezeEntityPosition(entity, true)
-    SetEntityInvincible(entity, true)
-    SetBlockingOfNonTemporaryEvents(entity, true)
-
-    -- Release the model from memory after creating the ped
-    SetModelAsNoLongerNeeded(model)
-
-    -- Return the entity so it can be used by ox_target
-    return entity
-end
-
--- Function to register and open the boss menu
-local function OpenBossMenu()
-
-    QBCore.Functions.TriggerCallback('custom:CheckDutyStatus', function(isOnDuty)
-
-        local onDutyStatus = isOnDuty and "Already On Duty" or "Go On Duty"
-
-        lib.registerContext({
-
-            id = 'boss_menu',
-
-            title = 'Boss Menu',
-
-            options = {
-
-                {
-
-                    title = onDutyStatus,
-
-                    description = isOnDuty and "You are currently on duty" or "Toggle duty status",
-
-                    icon = 'fa-solid fa-pen',
-
-                    onSelect = function()
-
-                        if not isOnDuty then
-
-                            QBCore.Functions.TriggerCallback('custom:CheckDriverLicense', function(hasLicense)
-
-                                if hasLicense then
-
-                                    QBCore.Functions.Notify("Bhai On Duty Hoisos", "success")
-
-                                    TriggerServerEvent('custom:ToggleDuty')
-
-                                    -- Re-register the menu to update the on-duty status in the menu
-
-                                    OpenBossMenu()
-
-                                else
-
-                                    QBCore.Functions.Notify("Don't Have driving license to do this job", "error")
-
-                                end
-
-                            end)
-
-                        else
-
-                            QBCore.Functions.Notify("You are already on duty", "error")
-
-                        end
-
-                    end
-
-                },
-
-                {
-
-                    title = 'Close Menu',
-
-                    description = 'Close the boss menu',
-
-                    icon = 'fa-solid fa-times',
-
-                    onSelect = function()
-
-                        lib.closeContext()
-
-                    end
-
-                }
-
-            }
-
-        })
-
-        lib.showContext('boss_menu')
-
-    end)
-
-end
-
-
-
 RegisterCommand('taxigooffduty', function()
     QBCore.Functions.TriggerCallback('custom:CheckDutyStatus', function(isOnDuty)
         if isOnDuty then
@@ -220,8 +104,6 @@ RegisterCommand('taxigooffduty', function()
             local veh = GetVehiclePedIsIn(playerPed, false) -- Get the vehicle the player is in
             local playerInCorrectVehicle = false
             QBCore.Functions.Notify("Bhai Off Duty Hoisos", "success")
-
-            -- Remove NPC blip
             if NpcData.NpcBlip ~= nil and DoesBlipExist(NpcData.NpcBlip) then
                 print("[DEBUG] Removing NPC blip ID: " .. tostring(NpcData.NpcBlip))
                 SafeCall(RemoveBlip, NpcData.NpcBlip)
@@ -229,8 +111,6 @@ RegisterCommand('taxigooffduty', function()
             else
                 print("[DEBUG] No valid NPC blip to remove or blip does not exist.")
             end
-
-            -- Remove NPC
             if NpcData.Npc ~= nil then
                 SafeCall(function()
                     local RemovePed = function(p)
@@ -241,37 +121,19 @@ RegisterCommand('taxigooffduty', function()
                     RemovePed(NpcData.Npc)
                 end)
             end
-            -- Reset NPC task
             SafeCall(ResetNpcTask)
             QBCore.Functions.Notify("You are now off duty. Onduty Function Call", "success")
-
-            -- Toggle off duty on the server and vanish rented vehicle
             TriggerServerEvent('custom:ToggleDuty')
-
-            -- Remove player's helmet/hat
             ClearPedProp(playerPed, 0)    
-
-            -- Clear the stored vehicle reference
             playerVehicle = nil
         else
             QBCore.Functions.Notify("You are already off duty", "error")
         end
     end)
-end, false) -- false means the command doesn't need to be run as an admin
+end, false)
 
-CreateThread(function()
-    local bossPedEntity = SpawnBossPed()
-    exports.ox_target:addLocalEntity(bossPedEntity, {
 
-        name = "boss_target",
-        label = 'Taxi Boss',
-        icon = 'fa-solid fa-pen',
-        onSelect = function ()
-            OpenBossMenu()
-        end 
-    })
 
-end)
 
 local function resetMeter()
     meterData = {
@@ -615,12 +477,10 @@ AddEventHandler('custom:ChargeForRentalResult', function(success, data)
     end
 end)
 
-
 RegisterNetEvent('qb-taxi:client:TakeVehicle', function(data)
     -- Trigger the server event to charge the player
     TriggerServerEvent('custom:ChargeForRental', data)
 end)
-
 
 
 function closeMenuFull()
@@ -931,9 +791,6 @@ CreateThread(function()
     end
 end)
 
-
--- POLY & TARGET Conversion code
-
 -- setup qb-target
 function setupTarget()
     CreateThread(function()
@@ -1105,7 +962,7 @@ function setupCabParkingLocation()
     local taxiParking = BoxZone:Create(vector3(908.62, -173.82, 74.51), 11.0, 38.2, {
         name = 'qb-taxi',
         heading = 55,
-        --debugPoly=true
+        debugPoly=true
     })
 
     taxiParking:onPlayerInOut(function(isPlayerInside)
@@ -1146,3 +1003,5 @@ CreateThread(function()
         Wait(1)
     end
 end)
+
+

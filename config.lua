@@ -9,9 +9,15 @@ Config = {
 
     DefaultTextLocation = 'left', -- left, right, top
 
-    bossPed = {
-        model = 'hc_driver',
-        coords = vector4(894.91, -179.13, 74.7, 231.05)
+    BossPed = {
+        [1] = {
+            model = 'hc_driver',
+            coords = vector4(894.91, -179.13, 74.7, 231.05)
+        },
+        [2] = {
+            model = 'hc_driver',
+            coords = vector4(914.79, -174.67, 74.32, 138.89)
+        },
     },
 
     AllowedVehicles = {
@@ -31,9 +37,7 @@ Config = {
     },
 
     Location = vector3(909.5, -177.35, 74.22),     -- map blip position
-    parkLocation = vector3(909.5, -177.35, 74.22), -- vehicle garage location
-
-    Duty = vector3(894.88, -179.22, 74.7),
+    parkLocation = vector3(916.65, -156.98, 75.23), -- vehicle garage location
 
     Advanced = {
         Bonus = {

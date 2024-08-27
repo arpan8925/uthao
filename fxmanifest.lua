@@ -22,6 +22,7 @@ client_scripts {
     '@PolyZone/CircleZone.lua',
     '@PolyZone/ComboZone.lua',
     'client/main.lua',
+    'client/boss_ped.lua',
 }
 
 server_script 'server/main.lua'
