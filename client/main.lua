@@ -767,6 +767,7 @@ RegisterNetEvent('qb-taxi:client:DoTaxiNpc', function()
                                         if IsPedInVehicle(NpcData.Npc, veh, true) then
                                             npcInVehicle = true
                                             print("NPC successfully entered the vehicle")
+
                                         else
                                             attempts = attempts + 1
                                             print("NPC failed to enter the vehicle, attempt " .. attempts)
