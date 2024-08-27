@@ -225,85 +225,66 @@ end
 -- Register the /taxigooffduty command
 
 RegisterCommand('taxigooffduty', function()
-
     QBCore.Functions.TriggerCallback('custom:CheckDutyStatus', function(isOnDuty)
-
         if isOnDuty then
-
-            QBCore.Functions.Notify("Bhai Off Duty Hoisos", "success")
-
-
-
-            -- Check and remove NPC blip if it exists
-
-            if NpcData.NpcBlip ~= nil and DoesBlipExist(NpcData.NpcBlip) then
-
-                print("[DEBUG] Removing NPC blip ID: " .. tostring(NpcData.NpcBlip))
-
-                SafeCall(RemoveBlip, NpcData.NpcBlip)
-
-                NpcData.NpcBlip = nil -- Dereference the blip
-
-            else
-
-                print("[DEBUG] No valid NPC blip to remove or blip does not exist.")
-
-            end
-
-
-
-            -- Check and remove NPC if it exists
-
-            if NpcData.Npc ~= nil then
-
-                SafeCall(function()
-
-                    local RemovePed = function(p)
-
-                        SetTimeout(60000, function()
-
-                            DeletePed(p)
-
-                        end)
-
-                    end
-
-                    RemovePed(NpcData.Npc)
-
-                end)
-
-                print("[DEBUG] NPC removed.")
-
-            else
-
-                print("[DEBUG] No NPC to remove.")
-
-            end
-
-            SafeCall(ResetNpcTask)
-
-            QBCore.Functions.Notify("You are now off duty. Onduty Function Call", "success")
-
-            TriggerServerEvent('custom:ToggleDuty')
-            TriggerServerEvent('custom:VanishRentedVehicle')
             local playerPed = PlayerPedId()
-            ClearPedProp(playerPed, 0)    
+            local veh = GetVehiclePedIsIn(playerPed, false) -- Get the vehicle the player is in
+            local playerInCorrectVehicle = false
 
-            playerVehicle = nil
+            -- Check if the player is in the correct job vehicle
+            if veh and DoesEntityExist(veh) then
+                local plate = GetVehicleNumberPlateText(veh)
+                if playerVehicle and plate == GetVehicleNumberPlateText(NetToVeh(playerVehicle)) then
+                    playerInCorrectVehicle = true
+                end
+            end
 
+            if playerInCorrectVehicle then
+                QBCore.Functions.Notify("Bhai Off Duty Hoisos", "success")
 
+                -- Remove NPC blip
+                if NpcData.NpcBlip ~= nil and DoesBlipExist(NpcData.NpcBlip) then
+                    print("[DEBUG] Removing NPC blip ID: " .. tostring(NpcData.NpcBlip))
+                    SafeCall(RemoveBlip, NpcData.NpcBlip)
+                    NpcData.NpcBlip = nil -- Dereference the blip
+                else
+                    print("[DEBUG] No valid NPC blip to remove or blip does not exist.")
+                end
 
+                -- Remove NPC
+                if NpcData.Npc ~= nil then
+                    SafeCall(function()
+                        local RemovePed = function(p)
+                            SetTimeout(60000, function()
+                                DeletePed(p)
+                            end)
+                        end
+                        RemovePed(NpcData.Npc)
+                    end)
+                end
+
+                -- Reset NPC task
+                SafeCall(ResetNpcTask)
+                QBCore.Functions.Notify("You are now off duty. Onduty Function Call", "success")
+
+                -- Toggle off duty on the server and vanish rented vehicle
+                TriggerServerEvent('custom:ToggleDuty')
+                TriggerServerEvent('custom:VanishRentedVehicle')
+
+                -- Remove player's helmet/hat
+                ClearPedProp(playerPed, 0)    
+
+                -- Clear the stored vehicle reference
+                playerVehicle = nil
+            else
+                QBCore.Functions.Notify("Error: You must be in the job vehicle to go off duty", "error")
+            end
         else
-
             QBCore.Functions.Notify("You are already off duty", "error")
-
-            print("[DEBUG] Player is already off duty.")
-
         end
-
     end)
-
 end, false) -- false means the command doesn't need to be run as an admin
+
 
 -- Spawn the boss ped when the script is loaded and set up ox_target interaction
 
@@ -730,65 +711,74 @@ RegisterNetEvent('qb-taxi:client:DoTaxiNpc', function()
                             if dist < 5 then
                                 DrawText3D(Config.NPCLocations.TakeLocations[NpcData.CurrentNpc].x, Config.NPCLocations.TakeLocations[NpcData.CurrentNpc].y, Config.NPCLocations.TakeLocations[NpcData.CurrentNpc].z, Lang:t('info.call_npc'))
                                 if IsControlJustPressed(0, 38) then
-                                    local veh = GetVehiclePedIsIn(ped, 0)
-                                    local maxSeats, freeSeat = GetVehicleMaxNumberOfPassengers(veh)
+                                    local playerPed = PlayerPedId()
+                                    local veh = GetVehiclePedIsIn(playerPed, false) -- Get the vehicle the player is in
                                 
-                                    for i = maxSeats - 1, 0, -1 do
-                                        if IsVehicleSeatFree(veh, i) then
-                                            freeSeat = i
-                                            break
+                                    -- Check if the player is in the correct job vehicle
+                                    if veh and DoesEntityExist(veh) and playerVehicle and GetVehicleNumberPlateText(veh) == GetVehicleNumberPlateText(NetToVeh(playerVehicle)) then
+                                        -- Proceed with the rest of the script if the player is in the job vehicle
+                                        local maxSeats, freeSeat = GetVehicleMaxNumberOfPassengers(veh)
+                                        
+                                        for i = maxSeats - 1, 0, -1 do
+                                            if IsVehicleSeatFree(veh, i) then
+                                                freeSeat = i
+                                                break
+                                            end
                                         end
-                                    end
                                 
-                                    meterIsOpen = true
-                                    meterActive = true
-                                    lastLocation = GetEntityCoords(PlayerPedId())
-                                    SendNUIMessage({
-                                        action = 'openMeter',
-                                        toggle = true,
-                                        meterData = Config.Meter
-                                    })
-                                    SendNUIMessage({
-                                        action = 'toggleMeter'
-                                    })
-                                    ClearPedTasksImmediately(NpcData.Npc)
-                                    FreezeEntityPosition(NpcData.Npc, false)
+                                        meterIsOpen = true
+                                        meterActive = true
+                                        lastLocation = GetEntityCoords(PlayerPedId())
+                                        SendNUIMessage({
+                                            action = 'openMeter',
+                                            toggle = true,
+                                            meterData = Config.Meter
+                                        })
+                                        SendNUIMessage({
+                                            action = 'toggleMeter'
+                                        })
+                                        ClearPedTasksImmediately(NpcData.Npc)
+                                        FreezeEntityPosition(NpcData.Npc, false)
                                 
-                                    -- Attempt to make NPC enter the vehicle
-                                    local attempts = 0
-                                    local maxAttempts = 5
-                                    local npcInVehicle = false
+                                        -- Attempt to make NPC enter the vehicle
+                                        local attempts = 0
+                                        local maxAttempts = 5
+                                        local npcInVehicle = false
                                 
-                                    while not npcInVehicle and attempts < maxAttempts do
-                                        TaskEnterVehicle(NpcData.Npc, veh, -1, freeSeat, 1.0, 0)
-                                        Citizen.Wait(2000)  -- Wait 2 seconds to see if NPC enters the vehicle
+                                        while not npcInVehicle and attempts < maxAttempts do
+                                            TaskEnterVehicle(NpcData.Npc, veh, -1, freeSeat, 1.0, 0)
+                                            Citizen.Wait(2000)  -- Wait 2 seconds to see if NPC enters the vehicle
                                 
-                                        -- Check if NPC is in the vehicle
-                                        if IsPedInVehicle(NpcData.Npc, veh, true) then
-                                            npcInVehicle = true
-                                            print("NPC successfully entered the vehicle")
-
+                                            -- Check if NPC is in the vehicle
+                                            if IsPedInVehicle(NpcData.Npc, veh, true) then
+                                                npcInVehicle = true
+                                                print("NPC successfully entered the vehicle")
+                                            else
+                                                attempts = attempts + 1
+                                                print("NPC failed to enter the vehicle, attempt " .. attempts)
+                                            end
+                                        end
+                                
+                                        -- Handle case where NPC fails to enter after all attempts
+                                        if not npcInVehicle then
+                                            QBCore.Functions.Notify("NPC failed to enter the vehicle", "error")
+                                            -- Optionally: Handle this scenario, e.g., by removing the NPC or resetting the script
                                         else
-                                            attempts = attempts + 1
-                                            print("NPC failed to enter the vehicle, attempt " .. attempts)
+                                            listenForVehicleDamage()
+                                            resetMeter()
+                                            QBCore.Functions.Notify(Lang:t('info.go_to_location'))
+                                            if NpcData.NpcBlip ~= nil then
+                                                RemoveBlip(NpcData.NpcBlip)
+                                            end
+                                            GetDeliveryLocation()
+                                            NpcData.NpcTaken = true
                                         end
-                                    end
-                                
-                                    -- Handle case where NPC fails to enter after all attempts
-                                    if not npcInVehicle then
-                                        QBCore.Functions.Notify("NPC failed to enter the vehicle", "error")
-                                        -- Optionally: Handle this scenario, e.g., by removing the NPC or resetting the script
                                     else
-                                        listenForVehicleDamage()
-                                        resetMeter()
-                                        QBCore.Functions.Notify(Lang:t('info.go_to_location'))
-                                        if NpcData.NpcBlip ~= nil then
-                                            RemoveBlip(NpcData.NpcBlip)
-                                        end
-                                        GetDeliveryLocation()
-                                        NpcData.NpcTaken = true
+                                        -- Player is not in the job vehicle
+                                        QBCore.Functions.Notify("This is Not Your Job Vehicle", "error")
                                     end
-                                end                                
+                                end
+                                                            
                             end
                         end
                         Wait(1)
