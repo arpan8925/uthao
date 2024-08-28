@@ -186,15 +186,19 @@ end
 
 local function whitelistedVehicle()
     local veh = GetVehiclePedIsIn(PlayerPedId())
+    if veh == 0 then
+        return false -- Player is not in a vehicle
+    end
+    
     local vehModel = GetEntityModel(veh)
-    local vehPlate = GetVehicleNumberPlateText(veh):gsub("%s+", "") -- Get and sanitize the plate (remove spaces)
+    local vehPlate = GetVehicleNumberPlateText(veh):gsub("%s+", "")
     local retval = false
-
--- Use the separate function to check against Config.AllowedVehicles
+    
+    -- Use the separate function to check against Config.AllowedVehicles
     if checkAgainstAllowedVehicles(vehModel) then
         retval = true
     end
-
+    
     -- Check if the vehicle's model and plate match the player's owned vehicles
     if not retval then
         for _, vehicle in pairs(playerOwnedVehicles) do
@@ -205,13 +209,13 @@ local function whitelistedVehicle()
             end
         end
     end
-
+    
     -- Additional hardcoded check
     if vehModel == GetHashKey('dynasty') then
         retval = true
     end
-
-    return retval
+    
+    return retval    
 end
 
 
@@ -1067,5 +1071,4 @@ CreateThread(function()
         Wait(1)
     end
 end)
-
 
