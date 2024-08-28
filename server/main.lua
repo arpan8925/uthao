@@ -117,3 +117,28 @@ AddEventHandler('custom:CreditForVehicleReturn', function()
     xPlayer.Functions.AddMoney('bank', creditAmount, "Vehicle returned")
     TriggerClientEvent('QBCore:Notify', src, 'You have been credited $750 for returning the vehicle.', 'success')
 end)
+
+
+
+
+QBCore = exports['qb-core']:GetCoreObject()
+
+QBCore.Functions.CreateCallback('whitelistedVehicle:getOwnedVehicles', function(source, cb)
+    local Player = QBCore.Functions.GetPlayer(source)
+    if Player then
+        local citizenId = Player.PlayerData.citizenid
+        exports.oxmysql:fetch("SELECT vehicle, plate FROM player_vehicles WHERE citizenid = ?", {citizenId}, function(result)
+            local ownedVehicles = {}
+            for _, v in pairs(result) do
+                table.insert(ownedVehicles, {model = v.vehicle, plate = v.plate})
+            end
+            cb(ownedVehicles)
+        end)
+    else
+        cb({})
+    end
+end)
+
+
+
+

@@ -78,7 +78,7 @@ local function startjobmenu()
                 description = "Start Doing Uthao Job",
                 icon = 'fa-solid fa-car',
                 onSelect = function()
-                    print("Blip Marked")
+                    TriggerEvent('qb-taxi:client:DoTaxiNpc')
                 end
             },
             {

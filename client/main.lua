@@ -132,9 +132,6 @@ RegisterCommand('taxigooffduty', function()
     end)
 end, false)
 
-
-
-
 local function resetMeter()
     meterData = {
         fareAmount = 6,
@@ -145,22 +142,81 @@ local function resetMeter()
     }
 end
 
+local playerOwnedVehicles = {}
+
+-- Function to request owned vehicles from the server and print them
+local function loadPlayerOwnedVehicles()
+    QBCore.Functions.TriggerCallback('whitelistedVehicle:getOwnedVehicles', function(ownedVehicles)
+        playerOwnedVehicles = ownedVehicles
+
+        -- Print the contents of the playerOwnedVehicles table
+        print("Player Owned Vehicles:")
+        for _, vehicle in pairs(playerOwnedVehicles) do
+            print("Vehicle Model: " .. vehicle.model .. " | Plate: " .. vehicle.plate)
+        end
+    end)
+end
+
+-- Load vehicles and print them when the player spawns or resource starts
+AddEventHandler('playerSpawned', function()
+    loadPlayerOwnedVehicles()
+end)
+
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded')
+AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
+    loadPlayerOwnedVehicles()
+end)
+
+-- Optional: Print the table when the script is restarted
+AddEventHandler('onResourceStart', function(resourceName)
+    if GetCurrentResourceName() == resourceName then
+        loadPlayerOwnedVehicles()
+    end
+end)
+
+local function checkAgainstAllowedVehicles(vehModel)
+    for i = 1, #Config.AllowedVehicles, 1 do
+        if vehModel == GetHashKey(Config.AllowedVehicles[i].model) then
+            return true
+        end
+    end
+    return false
+end
+
+
 local function whitelistedVehicle()
-    local veh = GetEntityModel(GetVehiclePedIsIn(PlayerPedId()))
+    local veh = GetVehiclePedIsIn(PlayerPedId())
+    local vehModel = GetEntityModel(veh)
+    local vehPlate = GetVehicleNumberPlateText(veh):gsub("%s+", "") -- Get and sanitize the plate (remove spaces)
     local retval = false
 
-    for i = 1, #Config.AllowedVehicles, 1 do
-        if veh == GetHashKey(Config.AllowedVehicles[i].model) then
-            retval = true
+-- Use the separate function to check against Config.AllowedVehicles
+    if checkAgainstAllowedVehicles(vehModel) then
+        retval = true
+    end
+
+    -- Check if the vehicle's model and plate match the player's owned vehicles
+    if not retval then
+        for _, vehicle in pairs(playerOwnedVehicles) do
+            if vehModel == GetHashKey(vehicle.model) and vehPlate == vehicle.plate:gsub("%s+", "") then
+                retval = true
+                print("Whitelisted Vehicle Found: " .. vehicle.model .. " with Plate: " .. vehicle.plate)
+                break
+            end
         end
     end
 
-    if veh == GetHashKey('dynasty') then
+    -- Additional hardcoded check
+    if vehModel == GetHashKey('dynasty') then
         retval = true
     end
 
     return retval
 end
+
+
+
+
 
 local function IsDriver()
     return GetPedInVehicleSeat(GetVehiclePedIsIn(PlayerPedId(), false), -1) == PlayerPedId()
@@ -463,7 +519,6 @@ AddEventHandler('custom:ChargeForRentalResult', function(success, data)
                         print("Helmet Applied")
                     end
                     Citizen.Wait(100)
-                    TriggerEvent('qb-taxi:client:DoTaxiNpc')
                 end, data.model, coords, true)
             else
                 QBCore.Functions.Notify(Lang:t('info.no_spawn_point'), 'error')
@@ -486,6 +541,9 @@ end)
 function closeMenuFull()
     exports['qb-menu']:closeMenu()
 end
+
+
+
 
 -- Events
 RegisterNetEvent('qb-taxi:client:DoTaxiNpc', function()
@@ -539,7 +597,7 @@ RegisterNetEvent('qb-taxi:client:DoTaxiNpc', function()
                                     local veh = GetVehiclePedIsIn(playerPed, false) -- Get the vehicle the player is in
                                 
                                     -- Check if the player is in the correct job vehicle
-                                    if veh and DoesEntityExist(veh) and playerVehicle and GetVehicleNumberPlateText(veh) == GetVehicleNumberPlateText(NetToVeh(playerVehicle)) then
+                                    if whitelistedVehicle() then
                                         -- Proceed with the rest of the script if the player is in the job vehicle
                                         local maxSeats, freeSeat = GetVehicleMaxNumberOfPassengers(veh)
                                         
@@ -735,6 +793,10 @@ RegisterNetEvent('qb-taxijob:client:requestcab', function()
     TaxiGarage()
 end)
 
+
+
+
+
 local cooldown = false
 
 CreateThread(function()
@@ -751,7 +813,9 @@ CreateThread(function()
                         inRange = true
                         DrawMarker(2, Config.parkLocation.x, Config.parkLocation.y, Config.parkLocation.z, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, 0.5, 0.2, 200, 0, 0, 222, false, false, false, true, false, false, false)
                         if vehDist < 1.5 then
-                            if whitelistedVehicle() then
+                            local veh = GetVehiclePedIsIn(PlayerPedId())
+                            local vehModel = GetEntityModel(veh)
+                            if whitelistedVehicle() and checkAgainstAllowedVehicles(vehModel) then
                                 DrawText3D(Config.parkLocation.x, Config.parkLocation.y, Config.parkLocation.z + 0.3, Lang:t('info.vehicle_parking'))
                                 if IsControlJustReleased(0, 38) and not cooldown then
                                     if IsPedInAnyVehicle(PlayerPedId(), false) then
@@ -962,7 +1026,7 @@ function setupCabParkingLocation()
     local taxiParking = BoxZone:Create(vector3(908.62, -173.82, 74.51), 11.0, 38.2, {
         name = 'qb-taxi',
         heading = 55,
-        debugPoly=true
+        debugPoly=false
     })
 
     taxiParking:onPlayerInOut(function(isPlayerInside)

@@ -22,13 +22,9 @@ Config = {
 
     AllowedVehicles = {
         [1] = {
-            model = 'lectro',
+            model = 'Faggio',
             label = Lang:t('info.taxi_label_1')
-        },
-        [2] = {
-            model = 'nightblade',
-            label = Lang:t('info.taxi_label_2')
-        },
+        }
     },
 
     Meter = {

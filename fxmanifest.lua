@@ -25,7 +25,10 @@ client_scripts {
     'client/boss_ped.lua',
 }
 
-server_script 'server/main.lua'
+server_scripts {
+    '@oxmysql/lib/MySQL.lua', -- Ensure this is properly referenced
+    'server/main.lua',         -- Your server script
+}
 
 files {
     'html/meter.css',
