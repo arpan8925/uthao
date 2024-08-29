@@ -25,6 +25,8 @@ local meterData = {
     distanceTraveled = 0,
 }
 
+
+
 local NpcData = {
     Active = false,
     CurrentNpc = nil,
@@ -93,7 +95,6 @@ local function ResetNpcTask()
         distanceLeft = 0,
         CrashCount = 0
     }
-    print("[DEBUG] NPC tasks have been reset.")
 end
 
 
@@ -220,8 +221,6 @@ end
 
 
 
-
-
 local function IsDriver()
     return GetPedInVehicleSeat(GetVehiclePedIsIn(PlayerPedId(), false), -1) == PlayerPedId()
 end
@@ -290,7 +289,6 @@ local function GetDeliveryLocation()
 
                             end
 
-                            SetPedPropIndex(NpcData.Npc, 0, -1, 0, true)
 
                             TaskPlayAnim(NpcData.Npc, animDict, animName, 8.0, -8.0, 5000, 49, 0, false, false, false)
 
@@ -638,6 +636,7 @@ RegisterNetEvent('qb-taxi:client:DoTaxiNpc', function()
                                             -- Check if NPC is in the vehicle
                                             if IsPedInVehicle(NpcData.Npc, veh, true) then
                                                 npcInVehicle = true
+                                                SetPedPropIndex(NpcData.Npc, 0, -1, 0, true)
                                                 print("NPC successfully entered the vehicle")
                                             else
                                                 attempts = attempts + 1
@@ -658,6 +657,34 @@ RegisterNetEvent('qb-taxi:client:DoTaxiNpc', function()
                                             end
                                             GetDeliveryLocation()
                                             NpcData.NpcTaken = true
+                                            -- Monitor if NPC exits the vehicle
+                                            Citizen.CreateThread(function()
+                                                while NpcData.NpcTaken do
+                                                    Citizen.Wait(1000) -- Check every second
+                                                    if not IsPedInVehicle(NpcData.Npc, veh, true) and not IsPedDeadOrDying(NpcData.Npc, true) then
+                                                        print("NPC exited the vehicle, attempting to re-enter")
+                                                        TaskEnterVehicle(NpcData.Npc, veh, -1, freeSeat, 1.0, 0)
+
+                                                    elseif IsPedDeadOrDying(NpcData.Npc, true) then
+                                                        
+
+                                                        QBCore.Functions.Notify("Bhai More gese tor bou", "error")
+
+                                                        if NpcData.DeliveryBlip ~= nil then
+                                                            RemoveBlip(NpcData.DeliveryBlip)
+                                                            QBCore.Functions.Notify("Bhai Tor Chakri Sesh, Notun Kore Ne", "error")
+                                                        end
+                                                        local RemovePed = function(p)
+                                                            SetTimeout(6000, function()
+                                                                DeletePed(p)
+                                                            end)
+                                                        end
+                                                        RemovePed(NpcData.Npc)
+                                                        ResetNpcTask()
+                                                        break
+                                                    end
+                                                end
+                                            end)
                                         end
                                     else
                                         -- Player is not in the job vehicle
