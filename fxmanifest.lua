@@ -5,6 +5,8 @@ author 'Kakarot'
 description 'Allows players to work as a taxi driver and pickup npcs around the map'
 version '1.2.0'
 
+this_is_a_map 'yes'
+
 ui_page 'html/meter.html'
 
 shared_scripts {

@@ -1,5 +1,6 @@
 QBCore = exports['qb-core']:GetCoreObject()
 
+local bossPeds = {} -- Table to store ped entities
 
 local function SpawnBossPed(index)
     local model = GetHashKey(Config.BossPed[index].model)
@@ -95,9 +96,11 @@ local function startjobmenu()
 end
 
 
-local bossped function SpawnAndSetupBossPeds()
+-- Function to spawn and set up boss peds
+local function SpawnAndSetupBossPeds()
     -- Spawn the first Ped (Taxi Boss)
     local bossPedEntity1 = SpawnBossPed(1)
+    table.insert(bossPeds, bossPedEntity1) -- Store the spawned ped in the table
     exports.ox_target:addLocalEntity(bossPedEntity1, {
         name = "boss_target_1",
         label = 'On Duty Boss',
@@ -107,20 +110,32 @@ local bossped function SpawnAndSetupBossPeds()
         end 
     })
 
-    -- Spawn the second Ped (Another Boss, you can customize the function as needed)
-    local bossPedEntity2 = SpawnBossPed(2)  -- You can use a different function if you want a different Ped
+    -- Spawn the second Ped (Another Boss)
+    local bossPedEntity2 = SpawnBossPed(2)
+    table.insert(bossPeds, bossPedEntity2) -- Store the second ped
     exports.ox_target:addLocalEntity(bossPedEntity2, {
         name = "boss_target_2",
         label = 'Start Job',
         icon = 'fa-solid fa-pen',
         onSelect = function ()
-            startjobmenu()  -- You can use a different menu function if required
+            startjobmenu()
         end 
     })
+end
 
+
+-- Function to delete the spawned boss peds
+local function DeleteBossPeds()
+    for _, ped in pairs(bossPeds) do
+        if DoesEntityExist(ped) then
+            DeleteEntity(ped)
+        end
+    end
+    bossPeds = {} -- Clear the table after deleting
 end
 
 -- Return the SpawnAndSetupBossPeds function to be callable externally
 return {
-    SpawnAndSetupBossPeds = SpawnAndSetupBossPeds
+    SpawnAndSetupBossPeds = SpawnAndSetupBossPeds,
+    DeleteBossPeds = DeleteBossPeds
 }

@@ -168,10 +168,13 @@ AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
     loadPlayerOwnedVehicles()
 end)
 
--- Optional: Print the table when the script is restarted
+-- when the script is restarted
 AddEventHandler('onResourceStart', function(resourceName)
     if GetCurrentResourceName() == resourceName then
-        loadPlayerOwnedVehicles()
+        -- Delete the boss peds before respawning them
+        BossPeds.DeleteBossPeds()
+        -- Now spawn the boss peds again
+        BossPeds.SpawnAndSetupBossPeds()
     end
 end)
 
@@ -702,7 +705,7 @@ RegisterNetEvent('qb-taxi:client:DoTaxiNpc', function()
             QBCore.Functions.Notify(Lang:t('error.already_mission'))
         end
     else
-        QBCore.Functions.Notify(Lang:t('error.not_in_taxi'))
+        QBCore.Functions.Notify(Lang:t('error.not_in_taxi'), 'error')
     end
 end)
 
